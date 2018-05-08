@@ -1,0 +1,30 @@
+---
+title: "Bioinformatics Lecture 11 (Part 1)"
+author: "Cesar Arcasi Matta"
+date: "5/8/2018"
+output: html_document
+---
+
+**Section 1**
+
+Q1. Proportion of PDB entries of X-ray crystallgraphy = 125271; Proportion of protein structures = 3135
+Q2. Proportion of HIV-1 protease structures in crrent PDB = 3135
+
+## PDB statistics 
+
+Download CSV file from PDB database <http://www.rcsb.org/stats/summary>. Read this into R and determine fraction of X-ray structures. 
+
+```{r}
+pdb.stats <- read.csv("Data Export Summary.csv")
+```
+
+Lets calculate something
+
+```{r}
+precent <- (pdb.stats$Total / sum(pdb.stats$Total) ) * 100
+
+names(precent) <- pdb.stats$Experimental.Method
+
+precent
+```
+
