@@ -1,0 +1,37 @@
+---
+title: "Binformatics Lecture 12"
+author: "Cesar Arcasi Matta"
+date: "5/10/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Section 1.1**
+
+Q1: What is the name of the two non protein resid values in this structure?     - HOH (127) and MK (1)
+What does resid correspond to and how would you get a listing of all reside values in this structure?
+    - Resid = residuals is a generic function which extracts model residuals from objects returned by modeling functions.
+
+Select out protein only and ligand only
+```{r}
+protein <- trim.pdb(hiv, "protein")
+ligand <- trim.pdb(hiv, "ligand")
+ligand
+protein
+```
+
+  
+**Section 1.2**
+
+Write out these new PBD files so we can use them for docking.
+
+```{r}
+write.pdb(ligand, "1hsg_ligand.pdb")
+write.pdb(protein,"1hsg_protein.pdb`")  
+```
+
+
+
