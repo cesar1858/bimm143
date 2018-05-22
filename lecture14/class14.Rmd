@@ -1,0 +1,483 @@
+---
+title: "Bioinformatics Class14"
+author: "César Arcasi Matta"
+date: "5/17/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Transcriptomics and the analysis of RNA-Seq data
+
+
+
+## Import counData and colData into R
+
+```{r}
+counts <- read.csv("data/airway_scaledcounts.csv", stringsAsFactors = FALSE)
+metadata <-  read.csv("data/airway_metadata.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+head(counts)
+```
+
+```{r}
+head(metadata)
+```
+
+## Toy differential gene expression
+
+Look at the metadata object again to see which samples are control and which are drug treated
+
+```{r}
+View(metadata)
+```
+
+Find the sample id for those labeled control. Then calculate the mean counts per gene across these samples:
+
+```{r}
+control <- metadata[metadata[ , "dex" ] == "control", ]
+
+control.mean <- rowSums( counts [ , control$id] ) / 4
+
+names(control.mean) <- counts$ensgene
+```
+
+Q1. How would you make the above code more robust?
+      Not hard code values we can determine by the data
+       Ex. control.mean <- rowSums( counts [ , control$id] ) / length(control$id) 
+
+    What would happen if you were to add more samples. Would the values obtained with the excat code above be correct?
+      *No, i would need to calculate the mean counts per the new amount of genes.
+
+Q2. Follow the same procedure for the treated samples (i.e. calculate the mean per gene accross drug treated samples and assign to a labeled vector called treated.mean)
+
+```{r}
+treated <- metadata[metadata[ , "dex" ] == "treated", ]
+
+treated.mean <- rowSums( counts [ , treated$id] ) / 4
+
+names(treated.mean) <- counts$ensgene
+```
+
+We will combine our meancount data for bookkeeping purposes.
+
+```{r}
+meancounts <- data.frame(control.mean, treated.mean)
+```
+
+Directly comparing the raw counts is going to be problematic if we just happened to sequence one group at a higher depth than another. Later on we’ll do this analysis properly, normalizing by sequencing depth per sample using a better approach. But for now, colSums() the data to show the sum of the mean counts across all genes for each group. Your answer should look like this:
+
+```{r}
+colSums(meancounts)
+```
+
+Q3. Create a scatter plot showing the mean of the treated samples against the mean of the control samples. Your plot should look something like the following.
+
+```{r}
+plot(control.mean, treated.mean)
+```
+
+Wait a sec. There are 60,000-some rows in this data, but I’m only seeing a few dozen dots at most outside of the big clump around the origin. Try plotting both axes on a log scale (hint: see the help for ?plot.default to see how to set log axis.
+
+Ex. plot(x, y = NULL, type = "p",  xlim = NULL, ylim = NULL,
+     log = "", main = NULL, sub = NULL, xlab = NULL, ylab = NULL,
+     ann = par("ann"), axes = TRUE, frame.plot = axes,
+     panel.first = NULL, panel.last = NULL, asp = NA, ...)
+
+log	= a character string which contains "x" if the x axis is to be logarithmic, "y" if the y axis is to be logarithmic and "xy" or "yx" if both axes are to be logarithmic.
+     
+```{r}
+plot(control.mean, treated.mean, log = "xy")
+```
+
+We can find candidate differentially expressed genes by looking for genes with a large change between control and dex-treated samples. We usually look at the log2 of the fold change, because this has better mathematical properties.
+
+calculate log2foldchange, add it to our meancounts data.frame and inspect the results either with the head() or the View() function for example.
+
+```{r}
+meancounts$log2fc <- log2(meancounts[,"treated.mean"]/meancounts[,"control.mean"])
+
+head(meancounts)
+
+View(meancounts)
+```
+
+There are a couple of “weird” results. Namely, the NaN (“not a number””) and -Inf (negative infinity) results.
+
+The NaN is returned when you divide by zero and try to take the log. The -Inf is returned when you try to take the log of zero. 
+
+It turns out that there are a lot of genes with zero expression. Let’s filter our data to remove these genes. Again inspect your result (and the intermediate steps) to see if things make sense to you
+
+```{r}
+which()
+```
+
+
+```{r}
+zero.vals <- which(meancounts[,1:2]==0, arr.ind=TRUE)
+
+to.rm <- unique(zero.vals[,1])
+
+mycounts <- meancounts[-to.rm,]
+
+head(mycounts)
+```
+
+Q4. What is the purpose of the arr.ind argument in the which() function call above? 
+
+    Why would we then take the first column of the output and need to call the unique() function?
+    
+A common threshold used for calling something differentially expressed is a log2(FoldChange) of greater than 2 or less than -2. 
+
+Let’s filter the dataset both ways to see how many genes are up or down-regulated.
+
+```{r}
+up.ind <- mycounts$log2fc > 2
+
+down.ind <- mycounts$log2fc < (-2)
+
+```
+
+Q5. Using the up.ind and down.ind vectors above can you determine how many up and down regulated genes we have at the greater than 2 fc level?
+
+```{r}
+sum(up.ind)
+
+sum(down.ind)
+
+#or
+
+table(up.ind)
+
+table(down.ind)
+```
+
+```{r}
+paste("Number of UP genes", sum(up.ind))
+
+paste("number of DOWN genes", sum(down.ind))
+```
+
+## Adding annotation data
+
+```{r}
+anno <- read.csv("data/annotables_grch38.csv")
+head(anno)
+```
+
+Ideally we want this annotation data mapped (or merged) with our mycounts data. In a previous class on writing R functions we introduced the merge() function, which is one common way to do this.
+
+Q6. From consulting the help page for the merge() function can you set the by.x and by.y arguments appropriately to annotate our mycounts data.frame with all the available annotation data in your anno data.frame? 
+
+by.x and by.y = what columns we want.
+
+0 = row.names for x data set because it has no column name. 
+
+name the vector "results"
+
+```{r}
+results <- merge(mycounts, anno, by.x = 0 , by.y = "ensgene")
+
+View(results)
+```
+
+In cases where you don’t have a preferred annotation file at hand you can use other Bioconductor packages for annotation.
+
+Bioconductor’s annotation packages help with mapping various ID schemes to each other. 
+
+Load the AnnotationDbi package and the annotation package org.Hs.eg.db.
+
+```{r}
+library("AnnotationDbi")
+
+library("org.Hs.eg.db")
+```
+
+
+```{r}
+columns(org.Hs.eg.db)
+
+```
+
+We can use the mapIds() function to add individual columns to our results table. 
+
+We provide the row names of our results table as a key, and specify that keytype=ENSEMBL. The column argument tells the mapIds() function which information we want, and the multiVals argument tells the function what to do if there are multiple possible values for a single input value. 
+
+Here we ask to just give us back the first one that occurs in the database.
+
+```{r}
+mycounts$symbol <- mapIds(org.Hs.eg.db,
+                     keys=row.names(mycounts),
+                     column="SYMBOL",
+                     keytype="ENSEMBL",
+                     multiVals="first")
+
+head(mycounts$symbol)
+```
+
+Q7. Run the mapIds() function two more times to add the Entrez ID and UniProt accession as new columns called mycounts$entrez and mycounts$uniprot. 
+
+The head() of your results should look like the following:
+
+```{r}
+mycounts$entrez <- mapIds(org.Hs.eg.db,
+                     keys=row.names(mycounts),
+                     column="ENTREZID",
+                     keytype="ENSEMBL",
+                     multiVals="first")
+
+mycounts$uniprot <- mapIds(org.Hs.eg.db,
+                     keys=row.names(mycounts),
+                     column="UNIPROT",
+                     keytype="ENSEMBL",
+                     multiVals="first")
+
+```
+
+Q8. Examine your annotated results for those genes with a log2(FoldChange) of greater than 2 (or less than -2 if you prefer) with the View() function. What do you notice? Would you trust these results? Why or why not?
+
+```{r}
+head(mycounts[up.ind,])
+```
+
+## DESeq2 analysis
+
+```{r}
+library(DESeq2)
+citation("DESeq2")
+```
+
+# Importing data
+
+We will use the DESeqDataSetFromMatrix() function to build the required DESeqDataSet object and call it dds, short for our DESeqDataSet. If you get a warning about “some variables in design formula are characters, converting to factors” don’t worry about it. Take a look at the dds object once you create it.
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData=counts, 
+                              colData=metadata, 
+                              design=~dex, 
+                              tidy=TRUE)
+
+dds
+```
+
+# DESeq pipeline
+
+Here, we’re running the DESeq pipeline on the dds object, and reassigning the whole thing back to dds, which will now be a DESeqDataSet populated with all those values. Get some help on ?DESeq (notice, no “2” on the end). This function calls a number of other functions within the package to essentially run the entire pipeline (normalizing by library size by estimating the “size factors,” estimating dispersion for the negative binomial model, and fitting models and getting statistics for each gene for the design specified when you imported the data).
+```{r}
+dds <- DESeq(dds)
+```
+
+# Getting results
+
+Since we’ve got a fairly simple design (single factor, two groups, treated versus control), we can get results out of the object simply by calling the results() function on the DESeqDataSet that has been run through the pipeline. The help page for ?results and the vignette both have extensive documentation about how to pull out the results for more complicated models (multi-factor experiments, specific contrasts, interaction terms, time courses, etc.).
+
+```{r}
+res <- results(dds)
+
+res
+```
+
+Either click on the res object in the environment pane or pass it to View() to bring it up in a data viewer. Why do you think so many of the adjusted p-values are missing (NA)? Try looking at the baseMean column, which tells you the average overall expression of this gene, and how that relates to whether or not the p-value was missing. Go to the DESeq2 vignette and read the section about “Independent filtering and multiple testing.”
+
+Note. The goal of independent filtering is to filter out those tests from the procedure that have no, or little chance of showing significant evidence, without even looking at the statistical result. Genes with very low counts are not likely to see significant differences typically due to high dispersion. This results in increased detection power at the same experiment-wide type I error [i.e., better FDRs].
+
+We can summarize some basic tallies using the summary function.
+
+```{r}
+summary(res)
+```
+
+We can order our results table by the smallest p value:
+
+```{r}
+res0ordered <- res [order(res$pvalue), ]
+```
+
+The results function contains a number of arguments to customize the results table. By default the argument alpha is set to 0.1. 
+
+If the adjusted p value cutoff will be a value other than 0.1, alpha should be set to that value:
+
+```{r}
+res05 <- results(dds, alpha=0.05)
+
+summary(res05)
+```
+
+The more generic way to access the actual subset of the data.frame passing a threshold like this is with the subset() function, e.g.:
+
+```{r}
+resSig05 <- subset(as.data.frame(res), padj < 0.05)
+
+nrow(resSig05)
+```
+
+```{r}
+resSig01 <- subset(as.data.frame(res), padj < 0.01)
+
+nrow(resSig01)
+```
+
+
+Q9. How many are significant with an adjusted p-value < 0.05? 
+    2182
+    How about 0.01? 
+    1437
+    
+You can arrange and view the results by the adjusted p-value
+
+```{r}
+ord <- order( resSig01$padj )
+
+View(res01[ord,])
+
+head(resSig01[ord,])
+```
+
+Q10. Using either the previously generated anno object (annotations from the file annotables_grch38.csv file) or the mapIds() function (from the AnnotationDbi package) add annotation to your res01 results data.frame.
+
+```{r}
+library("AnnotationDbi")
+
+library("org.Hs.eg.db")
+
+columns(org.Hs.eg.db)
+```
+
+```{r}
+head(resSig01)
+```
+
+```{r}
+resSig01$symbol <- mapIds(org.Hs.eg.db,
+                     keys=row.names(resSig01),
+                     column="SYMBOL",
+                     keytype="ENSEMBL",
+                     multiVals="first")
+
+```
+
+Finally, let’s write out the ordered significant results with annotations. 
+
+See the help for ?write.csv if you are unsure here.
+
+```{r}
+write.csv(resSig01[ord,], "signif01_results.csv")
+
+```
+
+## Data Visualization
+
+# Plotting counts
+
+DESeq2 offers a function called plotCounts() that takes a DESeqDataSet that has been run through the pipeline, the name of a gene, and the name of the variable in the colData that you’re interested in, and plots those values. 
+
+See the help for ?plotCounts. 
+
+Let’s first see what the gene ID is for the CRISPLD2 gene using:
+
+```{r}
+i <- grep("CRISPLD2", resSig01$symbol)
+
+resSig01 [i,]
+```
+
+```{r}
+rownames(resSig01[i,])
+```
+
+Now, with that gene ID in hand let’s plot the counts, where our intgroup, or “interesting group” variable is the “dex” column.
+
+```{r}
+plotCounts(dds, gene="ENSG00000103196", intgroup="dex")
+```
+
+That’s just okay. Keep looking at the help for ?plotCounts. Notice that we could have actually returned the data instead of plotting. We could then pipe this to ggplot and make our own figure. Let’s make a boxplot.
+
+```{r}
+# Return the data
+d <- plotCounts(dds, gene="ENSG00000103196", intgroup="dex", returnData=TRUE)
+
+head(d)
+```
+
+We can mow use this returned object to plot a boxplot with the base graphics function boxplot().
+
+```{r}
+boxplot(count ~ dex , data=d)
+```
+
+As the returned object is a data.frame it is also all setup for ggplot2 based plotting. For example:
+
+```{r}
+library(ggplot2)
+
+ggplot(d, aes(dex, count)) + geom_boxplot(aes(fill=dex)) + scale_y_log10() + ggtitle("CRISPLD2")
+```
+
+Which plot do you prefer? Maybe time to learn ggplot via the DataCamp course ;-)
+
+# MA & Volcano plots
+
+Let’s make some other commonly produced visualizations from this data. First, let’s add a column called sig to our full res results that evaluates to TRUE if padj<0.05, and FALSE if not, and NA if padj is also NA.
+
+```{r}
+res$sig <- res$padj<0.05
+
+# How many of each?
+table(res$sig)
+```
+```{r}
+sum(is.na(res$sig))
+```
+
+Look up the Wikipedia articles on MA plots and volcano plots. 
+
+An MA plot shows the average expression on the X-axis and the log fold change on the y-axis. 
+
+A volcano plot shows the log fold change on the X-axis, and the −log10 of the p-value on the Y-axis (the more significant the p-value, the larger the −log10 of that value will be).
+
+MA plots
+
+```{r}
+biocLite("affydata")
+library(affydata)
+```
+
+
+```{r}
+biocLite("affydata")
+
+library(affydata)
+
+if (require(affydata)) 
+{
+     data(Dilution)
+}
+
+y <- (exprs(Dilution)[, c("20B", "10A")])
+
+x11()
+
+ma.plot( rowMeans(log2(y)), log2(y[, 1])-log2(y[, 2]), cex=1 )
+
+title("Dilutions Dataset (array 20B v 10A)")
+
+library(preprocessCore)
+
+#do a quantile normalization
+x <- normalize.quantiles(y)
+
+x11()
+
+ma.plot( rowMeans(log2(x)), log2(x[, 1])-log2(x[, 2]), cex=1 ) 
+title("Post Norm: Dilutions Dataset (array 20B v 10A)")
+```
+
+
+
+
+
