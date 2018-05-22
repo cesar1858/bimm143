@@ -1,0 +1,54 @@
+---
+title: "Bioinformatics Class13"
+author: "César Arcasi Matta"
+date: "5/17/2018"
+output: pdf_document
+---
+
+## Genome Informatics
+
+# Section 1: Identify genetic variants of interest
+
+There are a number of gene variants associated with childhood asthma. A study from Verlaan et al. (2009) shows that 4 candidate SNPs demonstrate significant evidence for association.
+
+Q1: What are those 4 candidate SNPs?
+    - rs12936231, rs8067378, rs9303277, and rs7216389
+    
+Q2: What three genes do these variants overlap or effect?
+    - ZPBP2, IKZF3, GSDMB
+
+Now, you want to know the location of SNPs and genes in the genome. You can find the coordinates for the SNP itself on the Ensemble page along with overlapping genes or whether it is intergenic (i.e. between genes). However, to explore the surrounding regions and neighboring SNPs you will need to visit the linked Ensemble genome browser by clicking on the Location tab (highlighted with a yellow rectangle above).
+
+Q3: What is the location of rs8067378 and what are the different alleles for rs8067378? 
+[HINT, alleles and location are listed at the top of the the Ensemble page. You may search in a genome browser to find this information]
+    - Chromosome 17: 39895095 (forward strand) A/G variants (43% G)
+    
+Q4: What are the downstream genes for rs8067378? Any genes named ZPBP2, GSDMB, and ORMDL3?
+    - Yes 
+    
+Q5: What proportion of the Mexican Ancestry in Los Angeles sample population (MXL) are homozygous for the asthma associated SNP (G|G)?
+[HINT: You can download a CVS file for this population from ENSEMBLE and use the R functions read.csv(), and table() to answer this question]
+
+```{r}
+MexLA<- read.csv("373531-SampleGenotypes-Homo_sapiens_Variation_Sample_rs8067378.csv")
+
+table(MexLA)
+```
+
+ - 14%
+
+Q6. Back on the ENSEMBLE page, search for the particular sample HG00109. This is a male from the GBR population group. What is the genotype for this sample?
+ - G|G
+ 
+# Section 2: Initial RNA-Seq analysis
+
+Now, you want to understand whether the SNP will affect gene expression. You can find the raw RNA-Seq data of this one sample on the class webpage:
+
+To begin our analysis of this data we will use Galaxy on Jetstream.
+
+
+
+
+
+
+
