@@ -1,0 +1,97 @@
+---
+title: 'Bioinformatic: Find a Gene Assignment Part 2'
+author: "Cesar Arcasi Matta"
+date: "5/24/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Read KIF11 protein alignment  
+```{r}
+align <- read.fasta("musclealign.fst")
+
+align
+```
+
+Calculate sequence identity matrix
+```{r}
+ide.matx <- seqidentity(align)
+```
+
+Generate heatmap plot
+```{r}
+ide.matx_heatmap <- heatmap(ide.matx, margins = c(9,0))
+```
+
+Saving plot as Jpeg
+```{r}
+jpeg(file = "ide.matx_heatmap.jpeg")
+ide.matx_heatmap <- heatmap(ide.matx, margins = c(9,0))
+dev.off()  
+```
+
+Run NCBI blastp, on a given sequence, against the PDB, NR and swissprot sequence databases.
+```{r}
+blast_align <- blast.pdb("ASQPNSSAKKKEEKGKNIQVVVRCRPFNLAERKASAHSIVECDPVRKEVSVRTGGLADKSSRKTYTFDMVFGASTKQIDVYRSVVCPILDEVIMGYNCTIFAYGQTGTGKTFTMEGERSPNEEYTWEEDPLAGIIPRTLHQIFEKLTDNGTEFSVKVSLLEIYNEELF", database = "pdb", time.out = NULL, chain.single=TRUE)
+
+head(blast_align)
+```
+
+Fetch all annotation terms
+```{r}
+ids <- c("2WBE_C","1IA0_K","2OWM_A")
+
+anno <- pdb.annotate(ids)
+```
+
+Rearranging Table
+```{r}
+data <- blast_align[["hit.tbl"]]
+
+colnames(data)
+
+data1 <- data[c(14,56,68),c(2,11,3)]
+
+colnames(data1)[1] <- "ID"
+
+data1$ID[data1$ID=="2WBE_C"] <- "2WBE"
+
+data1$ID[data1$ID=="1IA0_K"] <- "1IA0"
+
+data1$ID[data1$ID=="2OWM_A"] <- "2OWM"
+
+data1
+
+names(anno)
+
+data2 <- anno[,c('structureId', 'experimentalTechnique', 'resolution', 'source')]
+
+colnames(data2)[1] <- "ID"
+
+rownames(data2) <- c("14","56","68")
+
+data2
+
+unique_hits <- merge(data2, data1)
+
+rownames(unique_hits) <- c("3","2","1")
+
+View(unique_hits)
+```
+
+```{r}
+write.table(unique_hits)
+```
+
+
+
+
+
+
+
+
+
+
