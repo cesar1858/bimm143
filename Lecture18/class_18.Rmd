@@ -1,0 +1,162 @@
+---
+title: "Bioinformatics Lecture 18"
+author: "Cesar Arcasi Matta"
+date: "5/31/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Section 2. The GenomicDataCommons R package
+
+#Install packages
+
+```{r}
+#install.packages("https://bioconductor.org/biocLite.R")
+```
+
+```{r}
+#source("https://bioconductor.org/biocLite.R")
+#biocLite(c("GenomicDataCommons", "maftools"))
+```
+
+#Load packages
+```{r}
+library(GenomicDataCommons)
+library(maftools)
+```
+
+#Check GDC status
+```{r}
+GenomicDataCommons::status()
+```
+
+#start our interaction with the GDC by searching the resource to find data that we are interested in investigating further. In GDC speak is is called “Querying GDC metadata”. 
+
+#EX: Our query might be ‘find how many patients were studied for each major project’ or ‘find and download all gene expression quantification data files for all pancreatic cancer patients’. We will answer both of these questions below.
+
+#The are four main sets of metadata that we can query with this package, namely cases(), projects(), files(), and annotations(). We will start with cases().
+
+#Find the number of cases/patients across different projects within the GDC.
+```{r}
+cases_by_project <- cases() %>%
+  facet("project.project_id") %>%
+  aggregations()
+
+head(cases_by_project)
+```
+
+#Note that the **facet()** and **aggregations()** functions here are from the GenomicDataCommons package and act to group all cases by the project id and then count them up.
+
+#If you use the **View()** fuction on our new 'cases_by_project' object you will find that the data we are after is accessibe via cases_by_project$project.project_id.
+
+```{r}
+View(cases_by_project$project.project_id)
+```
+
+#Write the R code to make a barplot of the cases per project. Lets plot this data.
+
+#Make a custom color vecor for our plot
+
+```{r}
+x <- cases_by_project$project.project_id
+
+mycols <- rep("light blue", nrow(cases_by_project$project.project_id))
+
+ind <- which(x[,1] == "TCGA-PAAD")
+
+mycols[ind] = "red"
+```
+
+# Add color vector to Barplot code with a log scale for the y axis (log="y"), rotated axis labels (las=2) and color the bar coresponding to the TCGA-PAAD project.
+
+```{r}
+par(mar=c(7, 4, 0, 0))
+
+barplot(x[,2], log = "y", las = 2, 
+        names.arg = x[,1], col = mycols)
+```
+
+#Lets take another snippet of code from their package vignette and adapt it to answer or second question from above - namely ‘find all gene expression data files for all pancreatic cancer patients’:
+
+```{r}
+#file_records <- files() %>%
+  #filter(~ cases.project.project_id == "TCGA-PAAD" &
+    #data_type == "Gene Expression Quantification" &
+    #analysis.workflow_type == "HTSeq - Counts") %>%
+ # response_all()
+```
+
+#Code above not working due to new database being worked on.
+
+## Part 2: Section 1. Protein sequences from healthy and tumor tissue
+
+# load bio 3d package and create a vector for sequence Data
+
+```{r}
+#library(bio3d)
+
+seqs <- read.fasta("lecture18_sequences.fa")
+
+seqs
+```
+
+Your task is to identify tumor specific mutations that could potentially be used for vaccine development.
+
+Q1: Identify sequence regions that contain all 9-mer peptides that are only found in the tumor. Hint: You will need to first identify the sites of mutation in the above sequences and then extract the surrounding subsequence region. This subsequence should encompass all possible 9-mers in the tumor derived sequence. In other words extract the subsequence from 8 residues before and 8 residues after all point mutations in the tumor sequence.
+
+```{r}
+## Calculate positional identity scores
+
+alignID <- conserv(seqs$ali, method = "identity")
+
+mutant.sites <- which(alignID < 1)
+
+mutant.sites
+
+## Exclude gap possitions from analysis
+
+gaps <- gap.inspect(seqs)
+
+mutant.sites <- mutant.sites[mutant.sites %in% gaps$f.inds]
+
+mutant.sites
+
+```
+
+# We can use these indices in mutant.sites to extract subsequences as required for the hands-on session. First however we come up with suitable names for these subsequences based on the mutation. This will help us later to make sense and keep track of our results.
+
+```{r}
+## Make a "names" label for our output sequences (one per mutant)
+
+mutant.names <- paste0(seqs$ali["P53_wt",mutant.sites],
+                       mutant.sites,
+                       seqs$ali["P53_mutant",mutant.sites])
+
+mutant.names
+```
+
+## Now lets extract all 9-mer mutant encompassing sequences for each mutant site. This is equivalent to finding the sequence region eight residues before and eight residues after our mutation sites and outputting this subsequence to a new FASTA file
+
+```{r}
+## Sequence positions surounding each mutant site
+
+start.position <- mutant.sites - 8
+end.position <-  mutant.sites + 8
+
+# Blank matrix to store sub-sequences
+
+store.seqs <- matrix("-", nrow=length(mutant.sites), ncol=17)
+rownames(store.seqs) <- mutant.names
+
+## Extract each sub-sequence
+
+for(i in 1:length(mutant.sites)) {
+  store.seqs[i,] <- seqs$ali["P53_mutant",start.position[i]:end.position[i]]
+}
+
+store.seqs
+```
+
