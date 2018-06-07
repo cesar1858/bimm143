@@ -1,0 +1,19 @@
+---
+title: "Bioinformatics Lecture 4"
+author: "Cesar Arcasi Matta"
+date: "6/6/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+x = 1:50
+
+plot(x, sin(x))
+
+plot.default(x, sin(x), type = "l", col = "blue", lwd = 5, xlab = "x = 1:50")
+```
+
